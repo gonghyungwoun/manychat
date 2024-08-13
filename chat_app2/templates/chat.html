@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pirate Chat - Room</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .roulette-wheel {
+            width: 200px;
+            height: 200px;
+            border: 5px solid #fff;
+            border-radius: 50%;
+            position: relative;
+            margin: 20px auto;
+            background-image: conic-gradient(
+                #f39c12 0% 20%,
+                #c0392b 20% 50%,
+                #27ae60 50% 100%
+            );
+            transform: rotate(0deg);
+            transition: transform 5s cubic-bezier(0.33, 1, 0.68, 1);
+        }
+
+        .roulette-pointer {
+            width: 0;
+            height: 0;
+            border-left: 10px solid transparent;
+            border-right: 10px solid transparent;
+            border-bottom: 20px solid #fff;
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+
+       
+           
+       
+        
+    </style>
+</head>
+<body class="bg-dark text-light">
+    <div class="container my-4">
+        <h2 class="text-center">채팅방: {{ room }}</h2>
+        <h4 class="text-center">Points: <span id="points">{{ points }}</span></h4>
+        <div id="chat-window" class="border rounded p-3 bg-light text-dark mb-3" style="height: 400px; overflow-y: scroll;">
+            <!-- Messages will appear here -->
+        </div>
+        <form id="chat-form">
+            <div class="input-group mb-3">
+                <input id="msg-input" type="text" class="form-control" placeholder="메세지를 입력하세요..." required>
+                <button class="btn btn-primary" type="submit">보내기</button>
+            </div>
+            <div class="mb-3">
+                <button type="button" class="btn btn-secondary emoji-btn">😀</button>
+                <button type="button" class="btn btn-secondary emoji-btn">😂</button>
+                <button type="button" class="btn btn-secondary emoji-btn">😍</button>
+                <button type="button" class="btn btn-secondary emoji-btn">😭</button>
+                <button type="button" class="btn btn-secondary emoji-btn">😡</button>
+                <button type="button" class="btn btn-secondary emoji-btn">😎</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🤔</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🤯</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🥳</button>
+                <button type="button" class="btn btn-secondary emoji-btn">😴</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🤢</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🥶</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🤡</button>
+                <button type="button" class="btn btn-secondary emoji-btn">👻</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🎃</button>
+                <button type="button" class="btn btn-secondary emoji-btn">💀</button>
+                <button type="button" class="btn btn-secondary emoji-btn">👽</button>
+                <button type="button" class="btn btn-secondary emoji-btn">🤖</button>
+
+               
+            </div>
+        </form>
+        <button id="roulette-btn" class="btn btn-warning mb-3">랜덤 룰렛 돌리기 (20 points)</button>
+        <div id="roulette-container" class="text-center hidden">
+            <div class="roulette-pointer"></div>
+            <div id="roulette-wheel" class="roulette-wheel"></div>
+        </div>
+        <button id="leave-btn" class="btn btn-danger">채팅방 나가기</button>
+    </div>
+
+    <script src="https://cdn.socket.io/4.0.1/socket.io.min.js"></script>
+    <script>
+        const socket = io();
+        const room = "{{ room }}";
+        const nickname = "{{ nickname }}";
+
+        socket.emit('join', {nickname, room});
+
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const msgInput = document.getElementById('msg-input');
+        const pointsDisplay = document.getElementById('points');
+        const emojiButtons = document.querySelectorAll('.emoji-btn');
+        const rouletteButton = document.getElementById('roulette-btn');
+        const rouletteContainer = document.getElementById('roulette-container');
+        const rouletteWheel = document.getElementById('roulette-wheel');
+
+        chatForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+            const msg = msgInput.value.trim();
+            if (msg) {
+                socket.emit('message', {msg, nickname, room});
+                msgInput.value = '';
+            }
+        });
+
+        emojiButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                msgInput.value += this.textContent;
+            });
+        });
+
+        rouletteButton.addEventListener('click', function() {
+            if (parseInt(pointsDisplay.textContent) < 20) {
+                alert("포인트가 부족합니다.");
+                return;
+            }
+
+            // Start the roulette animation
+            rouletteContainer.classList.remove('hidden');
+            const randomDegree = Math.floor(Math.random() * 360) + 720; // Random degree between 720 and 1080
+            rouletteWheel.style.transform = `rotate(${randomDegree}deg)`;
+
+            // Disable the button during the spin
+            rouletteButton.disabled = true;
+
+            setTimeout(function() {
+                // After 5 seconds, emit the roulette event to the server
+                socket.emit('roulette', {nickname, room});
+
+                // Hide the roulette animation and enable the button
+                rouletteContainer.classList.add('hidden');
+                rouletteWheel.style.transform = 'rotate(0deg)';  // Reset the rotation for the next spin
+                rouletteButton.disabled = false;
+            }, 5000);
+        });
+
+        socket.on('message', function(data) {
+            const message = document.createElement('div');
+            if (typeof data === 'string') {
+                message.textContent = data;
+                message.classList.add('text-muted', 'my-2');
+            } else {
+                message.innerHTML = `<strong>${data.nickname}</strong>: ${data.msg}`;
+                message.classList.add('my-2');
+                if (data.nickname === nickname) {
+                    pointsDisplay.textContent = data.points;
+                }
+            }
+            chatWindow.appendChild(message);
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        });
+
+        document.getElementById('leave-btn').addEventListener('click', function() {
+            socket.emit('leave', {nickname, room});
+            window.location = '/';
+        });
+
+        window.addEventListener('beforeunload', function() {
+            socket.emit('leave', {nickname, room});
+        });
+    </script>
+</body>
+</html>
